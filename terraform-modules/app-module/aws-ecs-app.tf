@@ -1,0 +1,102 @@
+resource "aws_ecs_task_definition" "app" {
+  family                   = var.app_name
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  container_definitions = jsonencode([
+    {
+      name              = var.app_name
+      image             = var.app_docker_image
+      cpu               = 256
+      memoryReservation = 512
+      memory            = 512
+      essential         = true
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.app.name
+          awslogs-region        = data.aws_region.current.region
+          awslogs-stream-prefix = "logs"
+        }
+      }
+      portMappings = [
+        {
+          name          = "http"
+          containerPort = var.app_docker_port
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        for key, value in var.app_environment_variables : {
+          name  = key
+          value = value
+        }
+      ]
+      healthCheck = {
+        command = [
+          "CMD-SHELL",
+          "curl --fail http://localhost:${var.app_docker_port}${var.app_health_check_path}"
+        ]
+        interval    = 10
+        timeout     = 5
+        retries     = 10
+        startPeriod = 5
+      }
+    }
+  ])
+}
+
+resource "aws_ecs_service" "app" {
+  cluster         = data.aws_ecs_cluster.this.arn
+  desired_count   = 2
+  launch_type     = "FARGATE"
+  name            = var.app_name
+  task_definition = aws_ecs_task_definition.app.arn
+
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
+
+  deployment_controller {
+    # Changing it will recreate the ECS Service
+    type = var.deployment_type == "Blue Green" ? "CODE_DEPLOY" : "ECS"
+  }
+
+  network_configuration {
+    subnets = data.aws_subnets.default.ids
+    # assign_public_ip = true is required to pull images from docker hub when it on a public subnet
+    # docs: https://docs.aws.amazon.com/AmazonECS/latest/userguide/fargate-task-networking.html
+    assign_public_ip = true
+    security_groups  = [aws_security_group.app.id]
+  }
+
+  load_balancer {
+    target_group_arn = local.is_alb_attachment ? aws_lb_target_group.alb_ingress_app_blue[0].arn : aws_lb_target_group.nlb_ingress_app_blue[0].arn
+    container_name   = var.app_name
+    container_port   = var.app_docker_port
+  }
+
+  # When Blue Green is active, Code Deploy will change LB as ECS Task Definition for us.
+  lifecycle {
+    ignore_changes = [
+      desired_count,
+      load_balancer,
+      task_definition
+    ]
+  }
+
+  # depends_on = [
+  #   aws_lb_listener.nlb_pre_production_http_prod
+  # ]
+}
+
+resource "aws_ecr_repository" "app" {
+  name                 = var.app_name
+  image_tag_mutability = "IMMUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
