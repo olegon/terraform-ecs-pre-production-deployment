@@ -19,7 +19,7 @@ provider "aws" {
 module "infra" {
   source = "../../../terraform-modules/app-module"
 
-  app_docker_image      = "105029661252.dkr.ecr.sa-east-1.amazonaws.com/haproxy-app:v1"
+  app_docker_image      = "105029661252.dkr.ecr.us-east-1.amazonaws.com/haproxy-app:v1"
   app_docker_port       = 8080
   app_health_check_path = "/haproxy-health"
   app_name              = "haproxy-app"

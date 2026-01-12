@@ -19,7 +19,7 @@ provider "aws" {
 module "infra_pre_production" {
   source = "../../../terraform-modules/app-module"
 
-  app_docker_image      = "105029661252.dkr.ecr.sa-east-1.amazonaws.com/node-app-pre-production:v1"
+  app_docker_image      = "105029661252.dkr.ecr.us-east-1.amazonaws.com/node-app-pre-production:v1"
   app_docker_port       = 5000
   app_health_check_path = "/v1/health"
   app_name              = "node-app-pre-production"
@@ -40,7 +40,7 @@ module "infra_pre_production" {
 module "infra_production" {
   source = "../../../terraform-modules/app-module"
 
-  app_docker_image      = "105029661252.dkr.ecr.sa-east-1.amazonaws.com/node-app-production:v1"
+  app_docker_image      = "105029661252.dkr.ecr.us-east-1.amazonaws.com/node-app-production:v1"
   app_docker_port       = 5000
   app_health_check_path = "/v1/health"
   app_name              = "node-app-production"
