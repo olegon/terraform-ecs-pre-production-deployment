@@ -37,3 +37,16 @@ module "infra" {
   origin_security_group_name = "production-reverse-proxy"
   load_balancer_name         = "production-reverse-proxy"
 }
+
+
+
+# Just to make it easier to run...
+resource "terraform_data" "build_and_push_docker_image" {
+  triggers_replace = [
+    module.infra.app_docker_image
+  ]
+
+  provisioner "local-exec" {
+    command = "sleep 5 && cd ../app && ./util-build-docker-image.sh"
+  }
+}

@@ -16,6 +16,26 @@ provider "aws" {
   }
 }
 
+module "infra_pre_production" {
+  source = "../../../terraform-modules/app-module"
+
+  app_docker_image      = "105029661252.dkr.ecr.sa-east-1.amazonaws.com/node-app-pre-production:v1"
+  app_docker_port       = 5000
+  app_health_check_path = "/v1/health"
+  app_name              = "node-app-pre-production"
+  app_environment_variables = {
+    "PORT"        = "5000"
+    "ENVIRONMENT" = "pre-production"
+  }
+
+  deployment_type               = "Blue Green"
+  deployment_bluegreen_strategy = "CodeDeployDefault.ECSAllAtOnce"
+
+  ecs_cluster_name           = "my-ecs-cluster-pre-production"
+  origin_security_group_name = "pre-production"
+  load_balancer_name         = "pre-production"
+  load_balancer_host_rule    = "node-app.elb-pre-production.olegon-private.com"
+}
 
 module "infra_production" {
   source = "../../../terraform-modules/app-module"
@@ -25,7 +45,8 @@ module "infra_production" {
   app_health_check_path = "/v1/health"
   app_name              = "node-app-production"
   app_environment_variables = {
-    "PORT" = "5000"
+    "PORT"        = "5000"
+    "ENVIRONMENT" = "production"
   }
 
   deployment_type               = "Blue Green"
@@ -37,22 +58,16 @@ module "infra_production" {
   load_balancer_host_rule    = "node-app.elb-production.olegon-private.com"
 }
 
-module "infra_pre_production" {
-  source = "../../../terraform-modules/app-module"
 
-  app_docker_image      = "105029661252.dkr.ecr.sa-east-1.amazonaws.com/node-app-pre-production:v1"
-  app_docker_port       = 5000
-  app_health_check_path = "/v1/health"
-  app_name              = "node-app-pre-production"
-  app_environment_variables = {
-    "PORT" = "5000"
+
+# Just to make it easier to run...
+resource "terraform_data" "build_and_push_docker_image" {
+  triggers_replace = [
+    module.infra_pre_production.app_docker_image,
+    module.infra_production.app_docker_image
+  ]
+
+  provisioner "local-exec" {
+    command = "sleep 5 && cd ../app && ./util-build-docker-image.sh"
   }
-
-  deployment_type               = "Blue Green"
-  deployment_bluegreen_strategy = "CodeDeployDefault.ECSAllAtOnce"
-
-  ecs_cluster_name           = "my-ecs-cluster-pre-production"
-  origin_security_group_name = "pre-production"
-  load_balancer_name         = "pre-production"
-  load_balancer_host_rule    = "node-app.elb-pre-production.olegon-private.com"
 }
